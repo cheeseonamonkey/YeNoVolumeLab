@@ -2,6 +2,18 @@
 
 Standalone deterministic Python submission for the Builderr YeNo BTC five-minute volume challenge. No third-party Python packages, credentials, exchange access, or real-money trading.
 
+## Architecture and design choices
+
+The submission deliberately favors **a small, auditable deterministic policy** over a learned model. Research variants (Ridge A1/A2, neural predictors, and risk gates) have not demonstrated better *completed trading volume with survivable cash* in independent execution tests. They are not included in this submission.
+
+- **Contract adapter (`bot.py`):** standard-library HTTP server accepts `POST /decide`, serializes calls to one stateful policy instance, checks the action shape and fee-inclusive cash cap, and returns `HOLD` on invalid or unsupported actions. The evaluator, not the bot, executes paper orders.
+- **Strategy (`yeno_evaluator/a_probe.py`):** per-market state tracks entry/exit and completed cycles. It uses the observed BTC midpoint minus the opening target to choose YES/NO, subject to timestamp freshness, non-provisional target, time-to-close, spread, price and depth filters. It never substitutes future reference data.
+- **Execution estimates (`yeno_evaluator/execution.py`):** order-book levels are sorted and walked to estimate executable shares, gross notional, and protocol-plus-overlay fees. A prospective buy must fit the cash cap **including fees** and pass an immediate liquidation-loss check; these are estimates, not guaranteed fills after latency.
+- **Exit priority:** while holding inventory, the bot considers estimated net proceeds and loss limits, then forces liquidation attempts near expiry. SELL decisions remain possible even when new entries are disallowed. Partial fills and final accounting belong to the evaluator.
+- **Operational constraints:** one worker, ordered observations, in-memory per-market state, no network dependencies. The loopback HTTP server is a development interface, not a hardened public deployment.
+
+The overall research harness uses causal incremental L2 replay with 250 ms simulated execution latency and 5-second local decision sampling. **That replay harness is not part of this minimal submission**, and its Binance BTC reference is only a proxy for the hidden evaluation inputs.
+
 ## Run
 
 ```sh
