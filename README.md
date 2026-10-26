@@ -30,6 +30,18 @@ python3 yeno-smoke-test.py --url http://127.0.0.1:8765/decide --observation yeno
 kill "$BOT_PID"
 ```
 
+## Measured AProbe scores (local paper replay)
+
+These are **our own AProbe bot** results, not other entrants, and are not official Builderr scores. All runs used original PMData incremental L2 with a causal **Binance BTCUSDT reference proxy**, 250 ms simulated fill latency, 5-second local decision sampling, $10 starting paper cash, and a $5 fee-inclusive buy cap. Markets are **spaced samples**, not complete 288-market days.
+
+| Date (2026) | Markets | Completed volume | Closed cycles | Ending cash | Fees | Maximum cash drawdown | Terminal flat |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| May 14 | 12 | $217.66 | 27 | $3.64 | $5.00 | 99.06% | Yes |
+| May 25 | 12 | $174.21 | 22 | $3.78 | $4.05 | 99.93% | Yes |
+| May 14 | 36 | $270.60 | 34 | $2.50 | $6.34 | 99.64% | Yes |
+
+The 36-market May 14 result is **not an independent additional day**: it overlaps the 12-market May 14 sample. The 36-market Ridge *shadow* run did not change AProbe's trades or scores. The severe cash drawdowns are an important weakness; none of these partial-day simulations proves reaching the $1,000 qualification threshold or surviving a full official 24-hour evaluation.
+
 ## Evidence and limitations
 
 The official starter-kit smoke test passed. A local 100-request loopback test measured median 1.49 ms and p99 2.50 ms (not a production load test). The heuristic was evaluated using PMData incremental L2 with a **proxy** Binance BTC reference, not Builderr's hidden official replay. Some simulations showed severe cash drawdowns. No $1,000 qualification or superior learned-policy performance is claimed. Paper trading only.
