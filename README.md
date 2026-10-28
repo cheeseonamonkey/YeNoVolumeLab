@@ -47,3 +47,39 @@ The 36-market May 14 result is **not an independent additional day**: it overlap
 The official starter-kit smoke test passed. A local 100-request loopback test measured median 1.49 ms and p99 2.50 ms (not a production load test). The heuristic was evaluated using PMData incremental L2 with a **proxy** Binance BTC reference, not Builderr's hidden official replay. Some simulations showed severe cash drawdowns. No $1,000 qualification or superior learned-policy performance is claimed. Paper trading only.
 
 The implementation uses the local AProbe policy and its fee/depth-aware execution helpers. No external model is loaded.
+
+## Submission verification and robustness
+
+The repository root is the **standalone submission**. It needs only Python 3.11+
+and the standard library; the much larger offline YeNoVolumeLab training/replay
+worktree is not required.
+
+Run the API and safety regressions before freezing a commit:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m compileall -q bot.py yeno_evaluator tests
+python3 bot.py &
+pid=$!
+python3 yeno-smoke-test.py --url http://127.0.0.1:8765/decide --observation yeno-sample-observation.json
+kill "$pid"
+git rev-parse HEAD
+```
+
+The server binds to loopback by default. Do not expose it directly to the
+internet. Official assessment uses the immutable commit you provide to Builderr,
+**not** subsequent changes to the default branch. Send Builderr a fresh commit
+hash if submitting a revised build.
+
+October 28 verification: original depth-walk had quadratic repeated summation
+and exceeded the 200 ms response budget in synthetic deep-book estimates. The
+optimized walk retains the exact fee formula and policy thresholds; it matched
+the previous implementation to within 1e-10 on 1,400 randomized fills (fees
+identical), and 840 synthetic sequential AProbe decisions agreed. At 1,000
+synthetic order-book levels the single BUY-estimate runtime dropped from
+approximately 1,648 ms to 22 ms on the test host. Malformed depth observations
+now produce a valid fail-closed decision instead of raising an IndexError.
+
+These are **interface and runtime improvements, not a demonstrated strategy
+edge**. Historical local full-day AProbe replays have not qualified for $1,000
+completed volume; the hidden Builderr evaluator has not been replicated.

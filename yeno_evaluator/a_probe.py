@@ -28,7 +28,7 @@ class AProbeBot:
     def __call__(self, obs:dict) -> dict:
         try:
             return self._decide(obs)
-        except (KeyError, ValueError, TypeError, ArithmeticError):
+        except (KeyError, ValueError, TypeError, IndexError, AttributeError, ArithmeticError):
             if obs.get("account",{}).get("position") is not None:
                 return {"action":"SELL"}
             return {"action":"HOLD"}

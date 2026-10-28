@@ -35,15 +35,17 @@ def fees(fills: list[tuple[float, float]]) -> float:
 
 def _fill(ladder: list[tuple[float, float]], qty: float, adverse: float, *, buying: bool) -> Fill:
     parts = []
+    filled = 0.
     for p, available in ladder:
-        take = min(available, qty - sum(q for _, q in parts))
+        take = min(available, qty - filled)
         if take > EPS:
             # Conservative synthetic adverse-price perturbation; no optimistic improvement.
             p = min(1 - EPS, p + adverse) if buying else max(EPS, p - adverse)
             parts.append((p, take))
-        if sum(q for _, q in parts) >= qty - EPS:
+            filled += take
+        if filled >= qty - EPS:
             break
-    return Fill(sum(q for _, q in parts), sum(p*q for p, q in parts), fees(parts))
+    return Fill(filled, sum(p*q for p, q in parts), fees(parts))
 
 
 def buy(asks: Iterable, cash_cap: float, *, max_shares: float = math.inf, adverse: float = 0) -> Fill:
