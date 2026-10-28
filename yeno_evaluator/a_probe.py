@@ -29,13 +29,16 @@ class AProbeBot:
         try:
             return self._decide(obs)
         except (KeyError, ValueError, TypeError, IndexError, AttributeError, ArithmeticError):
-            if obs.get("account",{}).get("position") is not None:
+            account = obs.get("account")
+            if isinstance(account, dict) and isinstance(account.get("position"), dict):
                 return {"action":"SELL"}
             return {"action":"HOLD"}
 
     def _decide(self, obs:dict) ->dict:
         ts=float(obs["timestamp"])
         sec=float(obs["market"]["secondsToClose"])
+        if not math.isfinite(ts) or not math.isfinite(sec):
+            return {"action":"HOLD"}
         market=str(obs["market"]["id"])
         if market!=self.market:
             self.market=market;self.was_holding=False;self.exiting=False
@@ -70,12 +73,16 @@ class AProbeBot:
                 or not(self.entry_latest<sec<=self.entry_earliest)):
             return {"action":"HOLD"}
         ref=obs.get("reference")
-        if (not ref or ref.get("targetProvisional",True)
-                or ref.get("retrospectiveOracle", False)
-                or ts-float(ref["observedAt"])>1.5
-                or float(ref["targetObservedAt"])>ts):
+        if (not isinstance(ref, dict) or ref.get("targetProvisional", True)
+                or ref.get("retrospectiveOracle", False)):
             return {"action":"HOLD"}
-        gap=float(ref["btcMidUsd"])-float(ref["openingTargetUsd"])
+        observed, target = float(ref["observedAt"]), float(ref["targetObservedAt"])
+        mid, opening = float(ref["btcMidUsd"]), float(ref["openingTargetUsd"])
+        if (not all(map(math.isfinite, (observed, target, mid, opening)))
+                or not 0 <= ts-observed <= 1.5 or target > ts
+                or mid <= 0 or opening <= 0):
+            return {"action":"HOLD"}
+        gap=mid-opening
         if abs(gap)<self.gap_floor:
             return {"action":"HOLD"}
         side="YES" if gap>0 else "NO"
@@ -87,7 +94,10 @@ class AProbeBot:
         if (best_ask>0.93 or best_ask<0.45 or
                 best_ask-best_bid>self.spread_max):
             return {"action":"HOLD"}
-        cap=min(4.85,float(obs["account"]["cashUsd"]),float(obs["rules"]["maximumBuyCashUsd"]))
+        cash, buy_limit = float(obs["account"]["cashUsd"]), float(obs["rules"]["maximumBuyCashUsd"])
+        if not math.isfinite(cash) or not math.isfinite(buy_limit):
+            return {"action":"HOLD"}
+        cap=min(4.85,cash,buy_limit)
         required=float(b.get("minOrderSize",5.) or 5.)
         if not math.isfinite(required) or required<=0:return {"action":"HOLD"}
         purchase=buy(asks,cap,max_shares=required)

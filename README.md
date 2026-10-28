@@ -83,3 +83,10 @@ now produce a valid fail-closed decision instead of raising an IndexError.
 These are **interface and runtime improvements, not a demonstrated strategy
 edge**. Historical local full-day AProbe replays have not qualified for $1,000
 completed volume; the hidden Builderr evaluator has not been replicated.
+
+October 28 causal-input audit: a future-dated BTC `reference.observedAt`
+previously passed the stale-reference check; non-finite BTC/target values
+could also trigger BUY, and `account: null` could crash the request handler.
+The current build rejects those malformed/noncausal inputs with HOLD.
+This does not modify decisions for valid, finite, receive-time-causal
+observations. It is a safety/contract fix, not evidence of improved volume.

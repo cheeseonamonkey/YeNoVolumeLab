@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """YeNo paper-only AProbe submission endpoint."""
 import json
+import math
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
@@ -10,7 +11,7 @@ bot = AProbeBot()
 mutex = Lock()
 
 def decide(obs):
-    if not isinstance(obs, dict):
+    if not isinstance(obs, dict) or not isinstance(obs.get("account"), dict):
         return {"action": "HOLD"}
     with mutex:
         action = bot(obs)
@@ -19,7 +20,8 @@ def decide(obs):
         try:
             cash = float(action["maxCashUsd"])
             cap = min(5., float(obs["account"]["cashUsd"]), float(obs["rules"]["maximumBuyCashUsd"]))
-            if action.get("outcome") in ("YES", "NO") and 0 < cash <= cap:
+            if (math.isfinite(cash) and math.isfinite(cap)
+                    and action.get("outcome") in ("YES", "NO") and 0 < cash <= cap):
                 return {"action": "BUY", "outcome": action["outcome"], "maxCashUsd": cash}
         except (KeyError, ValueError, TypeError):
             pass

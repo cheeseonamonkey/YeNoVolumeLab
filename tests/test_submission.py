@@ -77,6 +77,16 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertNotEqual(answer['action'], 'BUY')
 
+    def test_causal_invalid_reference_over_http(self):
+        from copy import deepcopy
+        obs = deepcopy(sample())
+        obs['reference']['observedAt'] = obs['timestamp'] + 1
+        self.assertEqual(self.request('/decide', obs), (200, {'action': 'HOLD'}))
+        obs['reference']['observedAt'] = float('nan')
+        self.assertEqual(self.request('/decide', obs), (200, {'action': 'HOLD'}))
+        obs['account'] = None
+        self.assertEqual(self.request('/decide', obs), (200, {'action': 'HOLD'}))
+
     def test_deep_book_latency(self):
         obs = sample()
         # One-sided 1000-level book; worst-case quantity accumulates slowly.
@@ -103,6 +113,69 @@ class ExecutionTests(unittest.TestCase):
         fill = sell([[.50, 5]], 5)
         self.assertAlmostEqual(fill.gross, 2.5)
         self.assertAlmostEqual(fill.fees, .1125, places=5)
+
+
+class CausalReferenceTests(unittest.TestCase):
+    def test_reference_future_and_nonfinite_are_hold(self):
+        from bot import decide
+        from copy import deepcopy
+        base = sample()
+        self.assertEqual(decide(deepcopy(base))['action'], 'BUY')
+        for field, value in [
+            ('observedAt', base['timestamp'] + .01),
+            ('observedAt', float('nan')),
+            ('targetObservedAt', float('nan')),
+            ('btcMidUsd', float('nan')),
+            ('btcMidUsd', float('inf')),
+            ('openingTargetUsd', float('nan')),
+            ('openingTargetUsd', -1),
+        ]:
+            obs = deepcopy(base)
+            obs['reference'][field] = value
+            with self.subTest(field=field, value=value):
+                self.assertEqual(decide(obs), {'action': 'HOLD'})
+
+    def test_malformed_account_and_cash_fail_closed(self):
+        from bot import decide
+        from copy import deepcopy
+        base = sample()
+        for value in (None, [], 'bad'):
+            obs = deepcopy(base)
+            obs['account'] = value
+            with self.subTest(value=value):
+                self.assertEqual(decide(obs), {'action': 'HOLD'})
+        for value in (float('nan'), float('inf'), float('-inf')):
+            obs = deepcopy(base)
+            obs['account']['cashUsd'] = value
+            with self.subTest(cash=value):
+                self.assertEqual(decide(obs), {'action': 'HOLD'})
+
+    def test_invalid_clock_fails_closed(self):
+        from bot import decide
+        from copy import deepcopy
+        base = sample()
+        for field, value in [
+            ('timestamp', float('nan')),
+            ('timestamp', float('inf')),
+            ('secondsToClose', float('nan')),
+            ('secondsToClose', float('inf')),
+        ]:
+            obs = deepcopy(base)
+            if field == 'secondsToClose':
+                obs['market'][field] = value
+            else:
+                obs[field] = value
+            with self.subTest(field=field):
+                self.assertEqual(decide(obs), {'action': 'HOLD'})
+
+    def test_zero_cash_does_not_block_forced_sell(self):
+        from bot import decide
+        from copy import deepcopy
+        obs = deepcopy(sample())
+        obs['account']['cashUsd'] = 0
+        obs['account']['position'] = {'outcome': 'YES', 'shares': 5}
+        obs['market']['secondsToClose'] = 20
+        self.assertEqual(decide(obs), {'action': 'SELL'})
 
 
 if __name__ == '__main__':
