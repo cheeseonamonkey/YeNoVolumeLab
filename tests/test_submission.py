@@ -109,6 +109,26 @@ class ExecutionTests(unittest.TestCase):
         self.assertAlmostEqual(fill.shares, 5., places=8)
         self.assertLessEqual(fill.gross + fill.fees, 5.0000001)
 
+    def test_full_affordable_buy_and_unaffordable_fallback(self):
+        # Full-book fast path and binary-search fallback must both respect
+        # fee-inclusive caps and min-order share semantics.
+        asks = [[.50, 5.], [.52, 8.]]
+        full = buy(asks, 4.85, max_shares=5.)
+        self.assertAlmostEqual(full.shares, 5., places=9)
+        self.assertLessEqual(full.gross + full.fees, 4.85 + 1e-9)
+        constrained = buy(asks, 2., max_shares=5.)
+        self.assertLess(constrained.shares, 5. - 1e-9)
+        self.assertLessEqual(constrained.gross + constrained.fees, 2. + 1e-9)
+
+    def test_full_buy_with_adverse_cost(self):
+        asks = [[.62, 7.], [.65, 11.]]
+        full = buy(asks, 5., max_shares=5., adverse=.01)
+        self.assertAlmostEqual(full.shares, 5., places=9)
+        self.assertLessEqual(full.gross + full.fees, 5.0000001)
+        partial = buy(asks, 2., max_shares=5., adverse=.01)
+        self.assertLess(partial.shares, 5. - 1e-9)
+        self.assertLessEqual(partial.gross + partial.fees, 2.0000001)
+
     def test_fee_layers(self):
         fill = sell([[.50, 5]], 5)
         self.assertAlmostEqual(fill.gross, 2.5)

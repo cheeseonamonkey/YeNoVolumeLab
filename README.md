@@ -90,3 +90,19 @@ could also trigger BUY, and `account: null` could crash the request handler.
 The current build rejects those malformed/noncausal inputs with HOLD.
 This does not modify decisions for valid, finite, receive-time-causal
 observations. It is a safety/contract fix, not evidence of improved volume.
+
+
+### Final latency optimization (October 28)
+
+A complete fee-inclusive BUY is now computed with one depth traversal when
+the requested shares are affordable; only constrained BUYs use binary search.
+This does **not** change AProbe's entry, exit, risk, or size thresholds.
+Compared with the previous immutable build, 1,000 randomized fills agreed
+within numerical precision (maximum 7.2e-14) and 1,008 sequential synthetic
+policy decisions were identical. On the same host, a synthetic 1,000-level
+BUY estimate fell from 20.82 ms to 0.97 ms; smaller books were also faster.
+
+Smoke-test and deterministic-parity evidence establishes code correctness,
+not hidden Builderr outcome parity or a qualifying cash runway. No learned
+Ridge/GRU component was promoted: executable-volume evidence did not show
+an improvement over the published deterministic policy.

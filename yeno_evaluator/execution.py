@@ -54,6 +54,12 @@ def buy(asks: Iterable, cash_cap: float, *, max_shares: float = math.inf, advers
     bound = min(max_shares, available)
     if not ladder or bound <= EPS or cash_cap <= EPS:
         return Fill(0, 0, 0)
+    # The submission normally requests exactly the five-share minimum and
+    # rejects partial fills. When the complete order is affordable, avoid
+    # forty-eight redundant book walks for a binary search of the same fill.
+    full = _fill(ladder, bound, adverse, buying=True)
+    if full.gross + full.fees <= cash_cap + 1e-10:
+        return full
     low, high = 0., bound
     for _ in range(48):
         mid = (low + high)/2
